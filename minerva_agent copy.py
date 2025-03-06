@@ -5,6 +5,7 @@ import dashscope
 from firecrawl import FirecrawlApp
 import os
 import json
+import pandas as pd
 from openai import OpenAI 
 from apify_client import ApifyClient  # Added for X/Twitter scraping
 import time
