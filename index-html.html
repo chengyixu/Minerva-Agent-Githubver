@@ -1,0 +1,457 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Minerva Agent</title>
+    <!-- Bootstrap CSS -->
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.0/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Font Awesome for icons -->
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <style>
+        body {
+            padding-top: 20px;
+            padding-bottom: 20px;
+        }
+        .tab-content {
+            padding: 20px;
+            border: 1px solid #dee2e6;
+            border-top: none;
+            border-radius: 0 0 0.25rem 0.25rem;
+        }
+        .container {
+            max-width: 1200px;
+        }
+        .card {
+            margin-bottom: 20px;
+        }
+        .analysis-box {
+            background-color: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 0.25rem;
+            padding: 15px;
+            margin-bottom: 15px;
+            white-space: pre-wrap;
+            font-family: monospace;
+        }
+        .tweet {
+            border-left: 4px solid #1DA1F2;
+            padding-left: 15px;
+            margin-bottom: 15px;
+        }
+        .loading {
+            display: none;
+            text-align: center;
+            margin: 20px 0;
+        }
+        .loading-spinner {
+            display: inline-block;
+            width: 2rem;
+            height: 2rem;
+            vertical-align: text-bottom;
+            border: 0.25em solid currentColor;
+            border-right-color: transparent;
+            border-radius: 50%;
+            animation: spinner-border .75s linear infinite;
+        }
+        @keyframes spinner-border {
+            to { transform: rotate(360deg); }
+        }
+        #chatHistory {
+            max-height: 500px;
+            overflow-y: auto;
+            margin-bottom: 20px;
+        }
+        .user-message {
+            background-color: #f0f7ff;
+            border-radius: 15px 15px 0 15px;
+            padding: 10px 15px;
+            margin-bottom: 10px;
+            max-width: 80%;
+            margin-left: auto;
+        }
+        .assistant-message {
+            background-color: #f1f1f1;
+            border-radius: 15px 15px 15px 0;
+            padding: 10px 15px;
+            margin-bottom: 10px;
+            max-width: 80%;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1 class="display-4 text-center mb-4">Minerva Agent</h1>
+
+        <!-- Main Tabs -->
+        <ul class="nav nav-tabs" id="mainTabs" role="tablist">
+            <li class="nav-item" role="presentation">
+                <button class="nav-link active" id="trending-tab" data-bs-toggle="tab" data-bs-target="#trending" type="button" role="tab" aria-controls="trending" aria-selected="true">热点监控</button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="reports-tab" data-bs-toggle="tab" data-bs-target="#reports" type="button" role="tab" aria-controls="reports" aria-selected="false">定时汇报</button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="rag-tab" data-bs-toggle="tab" data-bs-target="#rag" type="button" role="tab" aria-controls="rag" aria-selected="false">事实知识库 (RAG)</button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="chat-tab" data-bs-toggle="tab" data-bs-target="#chat" type="button" role="tab" aria-controls="chat" aria-selected="false">直接聊天</button>
+            </li>
+        </ul>
+
+        <!-- Tab Content -->
+        <div class="tab-content" id="mainTabsContent">
+            <!-- Tab 1: Trending Topics Monitoring -->
+            <div class="tab-pane fade show active" id="trending" role="tabpanel" aria-labelledby="trending-tab">
+                <h2>热点监控</h2>
+                
+                <!-- Trending subtabs -->
+                <ul class="nav nav-pills mb-3" id="trendingTabs" role="tablist">
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link active" id="websites-tab" data-bs-toggle="pill" data-bs-target="#websites" type="button" role="tab" aria-controls="websites" aria-selected="true">网站监控</button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link" id="twitter-tab" data-bs-toggle="pill" data-bs-target="#twitter" type="button" role="tab" aria-controls="twitter" aria-selected="false">X/Twitter监控</button>
+                    </li>
+                </ul>
+                
+                <!-- Trending subtabs content -->
+                <div class="tab-content" id="trendingTabsContent">
+                    <!-- Website monitoring -->
+                    <div class="tab-pane fade show active" id="websites" role="tabpanel" aria-labelledby="websites-tab">
+                        <div class="card">
+                            <div class="card-header">
+                                <h5 class="mb-0">监控推流的各大信息网站的热点</h5>
+                            </div>
+                            <div class="card-body">
+                                <div id="websitesDataStatus" class="alert alert-info">
+                                    尚未加载任何网站数据
+                                </div>
+                                
+                                <div class="mb-3">
+                                    <label for="websiteInput" class="form-label">网站域名 (逗号分隔),从www开始, 例如（www.jasonwei.net/blog）:</label>
+                                    <textarea id="websiteInput" class="form-control" rows="4">lilianweng.github.io, www.jasonwei.net/blog, muennighoff.github.io/, thomwolf.io/, dennyzhou.github.io/, aiera.com.cn/news/, www.jiqizhixin.com/, foresightnews.pro/column/detail/101</textarea>
+                                </div>
+                                
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <button id="scrapeWebsitesBtn" class="btn btn-primary w-100">开始网站监控</button>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <button id="rescrapeWebsitesBtn" class="btn btn-warning w-100">重新抓取</button>
+                                    </div>
+                                </div>
+                                
+                                <div id="websiteScrapeLoading" class="loading">
+                                    <div class="loading-spinner"></div>
+                                    <p id="websiteScrapeStatus">正在抓取网站数据...</p>
+                                </div>
+                                
+                                <hr>
+                                
+                                <div id="websiteAnalysisList" class="mt-4">
+                                    <!-- Website analysis results will be displayed here -->
+                                </div>
+                                
+                                <div id="cachedWebsiteData" class="mt-4">
+                                    <h5>已加载的网站数据</h5>
+                                    <button id="toggleCachedWebsiteBtn" class="btn btn-sm btn-outline-secondary mb-3">隐藏历史数据</button>
+                                    <div id="cachedWebsitesList">
+                                        <!-- Cached website data will be displayed here -->
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Twitter monitoring -->
+                    <div class="tab-pane fade" id="twitter" role="tabpanel" aria-labelledby="twitter-tab">
+                        <div class="card">
+                            <div class="card-header">
+                                <h5 class="mb-0">监控AI领域专家X动态</h5>
+                            </div>
+                            <div class="card-body">
+                                <div class="alert alert-info">
+                                    这个功能会抓取AI领域专家的X动态，并进行分析，提取insights。
+                                </div>
+                                
+                                <div id="twitterDataStatus" class="alert alert-info">
+                                    尚未加载任何Twitter数据
+                                </div>
+                                
+                                <div class="mb-3">
+                                    <label class="form-label">选择要监控的X账号:</label>
+                                    <div id="twitterHandlesList">
+                                        <div class="form-check form-check-inline">
+                                            <input class="form-check-input" type="checkbox" value="sama" id="checkSama" checked>
+                                            <label class="form-check-label" for="checkSama">sama (Sam Altman)</label>
+                                        </div>
+                                        <div class="form-check form-check-inline">
+                                            <input class="form-check-input" type="checkbox" value="ylecun" id="checkYLecun" checked>
+                                            <label class="form-check-label" for="checkYLecun">ylecun (Yann LeCun)</label>
+                                        </div>
+                                        <div class="form-check form-check-inline">
+                                            <input class="form-check-input" type="checkbox" value="AndrewYNg" id="checkAndrewNg" checked>
+                                            <label class="form-check-label" for="checkAndrewNg">AndrewYNg (Andrew Ng)</label>
+                                        </div>
+                                        <div class="form-check form-check-inline">
+                                            <input class="form-check-input" type="checkbox" value="fchollet" id="checkFChollet">
+                                            <label class="form-check-label" for="checkFChollet">fchollet (François Chollet)</label>
+                                        </div>
+                                        <div class="form-check form-check-inline">
+                                            <input class="form-check-input" type="checkbox" value="karpathy" id="checkKarpathy">
+                                            <label class="form-check-label" for="checkKarpathy">karpathy (Andrej Karpathy)</label>
+                                        </div>
+                                        <div class="form-check form-check-inline">
+                                            <input class="form-check-input" type="checkbox" value="ilyasut" id="checkIlyasut">
+                                            <label class="form-check-label" for="checkIlyasut">ilyasut (Ilya Sutskever)</label>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <button id="scrapeTwitterBtn" class="btn btn-primary w-100">开始抓取X数据</button>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <button id="rescrapeTwitterBtn" class="btn btn-warning w-100">重新抓取</button>
+                                    </div>
+                                </div>
+                                
+                                <div id="twitterScrapeLoading" class="loading">
+                                    <div class="loading-spinner"></div>
+                                    <p id="twitterScrapeStatus">正在抓取Twitter数据...</p>
+                                </div>
+                                
+                                <hr>
+                                
+                                <!-- AI Insights Section -->
+                                <div id="aiInsightsSection" class="mt-4" style="display: none;">
+                                    <h4>🔍 AI行业综合洞察</h4>
+                                    <div id="aiInsightsContent" class="analysis-box"></div>
+                                </div>
+                                
+                                <!-- Top Engaging Tweets Section -->
+                                <div id="topTweetsSection" class="mt-4" style="display: none;">
+                                    <h4>🔝 最具互动性的推文</h4>
+                                    
+                                    <ul class="nav nav-tabs" id="tweetsTabs" role="tablist">
+                                        <li class="nav-item" role="presentation">
+                                            <button class="nav-link active" id="retweets-tab" data-bs-toggle="tab" data-bs-target="#retweets" type="button" role="tab" aria-controls="retweets" aria-selected="true">热门转发</button>
+                                        </li>
+                                        <li class="nav-item" role="presentation">
+                                            <button class="nav-link" id="replies-tab" data-bs-toggle="tab" data-bs-target="#replies" type="button" role="tab" aria-controls="replies" aria-selected="false">热门回复</button>
+                                        </li>
+                                        <li class="nav-item" role="presentation">
+                                            <button class="nav-link" id="likes-tab" data-bs-toggle="tab" data-bs-target="#likes" type="button" role="tab" aria-controls="likes" aria-selected="false">热门点赞</button>
+                                        </li>
+                                    </ul>
+                                    
+                                    <div class="tab-content" id="tweetsTabsContent">
+                                        <div class="tab-pane fade show active" id="retweets" role="tabpanel" aria-labelledby="retweets-tab">
+                                            <div id="topRetweetsList" class="mt-3">
+                                                <!-- Top retweets will be displayed here -->
+                                            </div>
+                                        </div>
+                                        <div class="tab-pane fade" id="replies" role="tabpanel" aria-labelledby="replies-tab">
+                                            <div id="topRepliesList" class="mt-3">
+                                                <!-- Top replies will be displayed here -->
+                                            </div>
+                                        </div>
+                                        <div class="tab-pane fade" id="likes" role="tabpanel" aria-labelledby="likes-tab">
+                                            <div id="topLikesList" class="mt-3">
+                                                <!-- Top likes will be displayed here -->
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <!-- Individual Analyses Section -->
+                                <div id="individualAnalysesSection" class="mt-4" style="display: none;">
+                                    <h4>个人推文分析</h4>
+                                    <div id="individualAnalysesList">
+                                        <!-- Individual analyses will be displayed here -->
+                                    </div>
+                                </div>
+                                
+                                <!-- Cached Twitter Data Section -->
+                                <div id="cachedTwitterData" class="mt-4">
+                                    <h5>已加载的X数据</h5>
+                                    <button id="toggleCachedTwitterBtn" class="btn btn-sm btn-outline-secondary mb-3">隐藏历史数据</button>
+                                    <div id="cachedTwitterList">
+                                        <!-- Cached Twitter data will be displayed here -->
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Tab 2: Scheduled Reports -->
+            <div class="tab-pane fade" id="reports" role="tabpanel" aria-labelledby="reports-tab">
+                <h2>定时汇报</h2>
+                <div class="alert alert-info">
+                    定时整合汇报各大信息网站的重要内容（开发中）
+                </div>
+                
+                <div class="card">
+                    <div class="card-body">
+                        <div class="mb-3">
+                            <label for="scheduledTime" class="form-label">选择汇报时间（例如每日定时）</label>
+                            <input type="time" id="scheduledTime" class="form-control" value="12:00">
+                        </div>
+                        <div id="reportTimeDisplay" class="mt-2">
+                            当前设置的汇报时间为：12:00
+                        </div>
+                        <button id="saveScheduleBtn" class="btn btn-primary mt-3">保存设置</button>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Tab 3: Knowledge Base (RAG) -->
+            <div class="tab-pane fade" id="rag" role="tabpanel" aria-labelledby="rag-tab">
+                <h2>事实知识库</h2>
+                <p>上传文件或添加网站，系统会提取内容，并在聊天时基于这些信息进行回答。</p>
+                
+                <div class="card mb-4">
+                    <div class="card-header">
+                        <h5 class="mb-0">添加信息源</h5>
+                    </div>
+                    <div class="card-body">
+                        <form id="addSourceForm">
+                            <div class="mb-3">
+                                <label for="newSourceUrl" class="form-label">输入新信息源网址:</label>
+                                <input type="text" class="form-control" id="newSourceUrl" required>
+                            </div>
+                            <div class="mb-3">
+                                <label for="sourceDescription" class="form-label">信息源描述:</label>
+                                <textarea class="form-control" id="sourceDescription" rows="2"></textarea>
+                            </div>
+                            <button type="submit" class="btn btn-primary">添加信息源</button>
+                        </form>
+                        
+                        <div id="sourceAddLoading" class="loading">
+                            <div class="loading-spinner"></div>
+                            <p id="sourceAddStatus">正在抓取网站内容...</p>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="card mb-4">
+                    <div class="card-header">
+                        <h5 class="mb-0">上传文件</h5>
+                    </div>
+                    <div class="card-body">
+                        <form id="uploadFileForm">
+                            <div class="mb-3">
+                                <label for="fileUpload" class="form-label">选择要上传的文件:</label>
+                                <input class="form-control" type="file" id="fileUpload" multiple>
+                            </div>
+                            <button type="submit" class="btn btn-primary">上传文件</button>
+                        </form>
+                        
+                        <div id="fileUploadLoading" class="loading">
+                            <div class="loading-spinner"></div>
+                            <p id="fileUploadStatus">正在处理文件...</p>
+                        </div>
+                    </div>
+                </div>
+                
+                <h3>当前本地信息</h3>
+                
+                <div class="card mb-3">
+                    <div class="card-header">
+                        <h5 class="mb-0">网站信息</h5>
+                    </div>
+                    <div class="card-body">
+                        <div id="websiteInfoList">
+                            <!-- Website info will be displayed here -->
+                        </div>
+                        <div id="noWebsiteInfo" class="alert alert-info">
+                            还没有添加任何网站信息。
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="card mb-3">
+                    <div class="card-header">
+                        <h5 class="mb-0">上传的文件</h5>
+                    </div>
+                    <div class="card-body">
+                        <div id="uploadedFileList">
+                            <!-- Uploaded files will be displayed here -->
+                        </div>
+                        <div id="noUploadedFiles" class="alert alert-info">
+                            还没有上传任何文件。
+                        </div>
+                    </div>
+                </div>
+                
+                <button id="clearRagDataBtn" class="btn btn-danger">清空所有本地信息</button>
+            </div>
+            
+            <!-- Tab 4: Direct Chat -->
+            <div class="tab-pane fade" id="chat" role="tabpanel" aria-labelledby="chat-tab">
+                <h2>直接聊天</h2>
+                <p>基于大模型，您可以直接与 AI 进行对话。</p>
+                
+                <div class="card">
+                    <div class="card-body">
+                        <div class="mb-3">
+                            <label class="form-label">选择聊天模式:</label>
+                            <div class="form-check">
+                                <input class="form-check-input" type="radio" name="chatMode" id="qwenChat" value="qwen" checked>
+                                <label class="form-check-label" for="qwenChat">
+                                    Qwen聊天
+                                </label>
+                            </div>
+                            <div class="form-check">
+                                <input class="form-check-input" type="radio" name="chatMode" id="localKnowledgeChat" value="local">
+                                <label class="form-check-label" for="localKnowledgeChat">
+                                    本地知识聊天(Qwen)
+                                </label>
+                            </div>
+                            <div class="form-check">
+                                <input class="form-check-input" type="radio" name="chatMode" id="deepseekChat" value="deepseek">
+                                <label class="form-check-label" for="deepseekChat">
+                                    Deepseek聊天
+                                </label>
+                            </div>
+                        </div>
+                        
+                        <div id="chatHistory">
+                            <!-- Chat messages will be displayed here -->
+                        </div>
+                        
+                        <form id="chatForm">
+                            <div class="input-group mb-3">
+                                <input type="text" id="messageInput" class="form-control" placeholder="输入您的消息...">
+                                <button type="submit" class="btn btn-primary">发送</button>
+                            </div>
+                        </form>
+                        
+                        <div id="chatLoading" class="loading">
+                            <div class="loading-spinner"></div>
+                            <p>AI正在思考中...</p>
+                        </div>
+                        
+                        <button id="clearChatBtn" class="btn btn-outline-secondary mt-3">清空聊天记录</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <footer class="mt-5 text-center text-muted">
+            <p>Minerva Agent &copy; 2025 | GitHub Pages Version</p>
+        </footer>
+    </div>
+
+    <!-- JavaScript Dependencies -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.0/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.7.0/jquery.min.js"></script>
+    
+    <!-- App JavaScript -->
+    <script src="js/app.js"></script>
+</body>
+</html>
